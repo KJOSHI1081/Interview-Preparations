@@ -159,7 +159,9 @@ If you want to demonstrate deep expertise, mention **FlatBuffers** or **Cap'n Pr
 > *"While Protobuf is fast, it still requires a 'parse' step to turn the binary wire format into a memory-resident object. Tools like **Cap'n Proto** use a memory layout that is identical on the wire as it is in RAM. This allows for **Zero-Copy access**, where the application can read data directly from the buffer without any deserialization step at all. This is a game-changer for ultra-low latency systems like High-Frequency Trading (HFT)."*
 
 
+### 🏗️ Service Layer Architecture Diagram
 
+```mermaid
 graph TD
     subgraph "External World (Public Network)"
         A[Web/Mobile Clients]
@@ -198,10 +200,7 @@ graph TD
     E -.-> I
     F -.-> I
     G -.-> J
-
-    Notice that the Transcoder acts as a "bridge." This allows your frontend team to keep using standard JSON/REST (which is easy for browsers) while your backend team reaps the benefits of gRPC's speed and strict typing. By separating the Control Plane (Service Registry), you ensure that even if a service instance crashes, the system automatically routes around it.
-
-    # 🏛️ Service Layer Architecture: Component Reference
+```
 
 This table summarizes the core components of a modern, gRPC-backed microservices architecture. It highlights the transition from public-facing protocols to high-performance internal communication.
 
