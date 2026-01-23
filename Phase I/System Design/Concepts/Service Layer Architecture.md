@@ -170,30 +170,86 @@ graph TD
     subgraph "Edge & Routing Layer"
         B[Load Balancer]
         C[API Gateway / BFF]
-        H[(Service Registry - Consul/Etcd)]
+        H[(Service Registry)]
     end
 
-    subgraph "Internal Network (gRPC)"
+    subgraph "Internal Network (High-Speed gRPC)"
         D{Transcoder}
         E[Inventory Service]
         F[Order Service]
     end
 
-    %% Data Flow
-    A -->|JSON| B
+    %% 1. The Request Path
+    A -->|1. JSON Request| B
     B --> C
+    C <-->|Discovery Lookup| H
+    C -->|2. Map to Proto| D
+    D -.->|3. Binary Payload| E
     
-    %% The "Discovery" lookup you mentioned
-    C <-->|1. Where is the service?| H
-    
-    C -->|2. Send Request| D
-    D -.->|Binary Protobuf| E
-    D -.->|Binary Protobuf| F
+    %% 2. The Response Path (The Update)
+    E -.->|4. Binary Response| D
+    D -->|5. Transcode to JSON| C
+    C -->|6. JSON Response| B
+    B --> A
 
-    %% Health Checks
-    E -.->|Heartbeat| H
-    F -.->|Heartbeat| H
+    style D fill:#f96,stroke:#333,stroke-width:2px
 ```
+
+## 🔄 Bidirectional Transcoding: The Request-Response Loop
+
+In high-scale architectures, the **Transcoder** acts as a two-way translator. It ensures that the internal network remains as fast as possible while the public API remains compatible with standard web tools.
+
+
+
+| Direction | Action | Data Transformation |
+| :--- | :--- | :--- |
+| **Inbound (Request)** | **Encoding** | Client JSON $\rightarrow$ Binary Protobuf |
+| **Outbound (Response)** | **Decoding** | Binary Protobuf $\rightarrow$ Client JSON |
+
+---
+
+### 💡 Staff Engineering Insight: The Cost of Serialization
+While gRPC is fast, the act of transcoding at the edge introduces latency. 
+
+* **Inbound (CPU Bound):** Parsing JSON strings is expensive because the CPU must scan for delimiters (`{`, `:`, `"`) and handle character escaping.
+* **Outbound (Memory Bound):** Converting binary back to JSON requires the creation of many small string objects, which can increase **Garbage Collection (GC) pressure** in languages like Java, Go, or Python.
+
+> **Optimization Tip:** To reduce this overhead, Staff Engineers often implement **Field Masks**, where the client specifies exactly which fields they need, allowing the transcoder to skip unnecessary data transformation.
+
+---
+
+## 🧱 Where the "Outgoing" Conversion Happens
+
+The return path (Response) is just as critical as the request path. It follows a specific sequence to move data from a high-performance internal state back to a client-friendly format.
+
+1.  **The Service Logic:** The internal service (e.g., Inventory) completes its task and returns a **Protobuf object**. At this stage, the data is still small, binary, and highly efficient for internal network travel.
+2.  **The Transcoder's Role:** * It receives the binary buffer from the gRPC call.
+    * It uses **Reflection APIs** or the **Generated Code** (`.pb.py`, `.pb.go`, etc.) to map binary tags back to human-readable field names (e.g., Tag `1` is mapped back to `"stock_count"`).
+    * It serializes this mapping into a standard JSON string.
+3.  **The Gateway's Role:** It wraps the JSON string with the necessary metadata, such as HTTP status codes and headers (e.g., `Content-Type: application/json`), and dispatches the result to the client.
+
+
+
+---
+
+## 📊 Performance Impact: Inbound vs. Outbound
+
+Understanding the bottleneck at the edge is a frequent Staff-level interview topic.
+
+| Step | Complexity | Staff Engineering Nuance |
+| :--- | :--- | :--- |
+| **JSON → Proto** | **High CPU** | This is the "hardest" part of the loop. The parser must scan strings, validate syntax, and search for keys, which is computationally expensive. |
+| **Proto → JSON** | **Moderate CPU** | Faster than inbound because binary tags are indexed, but it creates **Memory Allocation pressure** due to heavy string building for the JSON output. |
+
+
+
+---
+
+## 💡 Staff Interview Pro-Tip: "Over-fetching & Field Masks"
+
+If an interviewer asks how to optimize the **Outgoing JSON size** or reduce Gateway latency:
+
+> "To minimize transcoding overhead and bandwidth, we implement **Field Masks** in our gRPC definitions. The client sends a specific list of required fields (e.g., `fields=price,id`). The internal service then only populates those specific fields in the Protobuf response. The Transcoder, in turn, only has to generate JSON for those limited keys, significantly reducing CPU cycles spent on serialization at the Edge."
 
 This table summarizes the core components of a modern, gRPC-backed microservices architecture. It highlights the transition from public-facing protocols to high-performance internal communication.
 
