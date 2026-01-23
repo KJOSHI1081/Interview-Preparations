@@ -336,6 +336,27 @@ In high-load scenarios, the Transcoder acts as a **Buffer**. If the client (WebS
 If an interviewer asks how to optimize this protocol:
 > "The biggest risk in Gateway-to-Transcoder communication is the **Double-Parse**. If the Gateway parses the JSON to check for an API Key, and then the Transcoder parses the *same* JSON to convert it to Protobuf, you've doubled your CPU cost. In a Staff-level design, we use **Header-Based Routing** so the Gateway only looks at metadata, leaving the heavy payload parsing to be done exactly once by the Transcoder."
 
+## 🌐 Multi-Cluster WebSocket Passthrough
+
+When the Load Balancer and Transcoder live in different clusters, the architecture shifts to a **Passthrough** model. The Load Balancer acts as a "Dumb Pipe" (Layer 4 or Layer 7 Proxy).
+
+### The Traffic Flow
+1. **Client to LB:** High-latency public internet connection (WSS/JSON).
+2. **LB to Transcoder:** Dedicated backbone/inter-cluster connection (WSS/JSON).
+3. **Transcoder to Backend:** High-speed internal cluster network (**gRPC/Protobuf**).
+
+
+
+### 💡 Staff Engineering Nuance: The "Idle Timeout" Problem
+In a multi-cluster setup, Load Balancers (like AWS ALB or NGINX) often have a default **Idle Timeout** (e.g., 60 seconds). Since WebSockets are persistent, if no data is sent for 60 seconds, the LB will silently kill the connection.
+
+**The Solution:**
+* **TCP Keepalives:** Setting keepalives at the OS level.
+* **Application Pings:** The Transcoder must send a "Heartbeat" (Pong) frame every 30 seconds to the client to prove to the Load Balancer that the connection is still "active."
+
+### 📊 Summary of Responsibility
+* **Load Balancer:** Connection termination, TLS offloading, and "Sticky" routing.
+* **Transcoder:** Protocol termination (WebSocket), Payload Parsing (JSON → Proto), and gRPC streaming.
 
 ---
 
