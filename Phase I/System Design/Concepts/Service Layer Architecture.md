@@ -163,43 +163,36 @@ If you want to demonstrate deep expertise, mention **FlatBuffers** or **Cap'n Pr
 
 ```mermaid
 graph TD
-    subgraph "External World (Public Network)"
+    subgraph "External World"
         A[Web/Mobile Clients]
     end
 
-    subgraph "Edge Layer (DMZ)"
+    subgraph "Edge & Routing Layer"
         B[Load Balancer]
         C[API Gateway / BFF]
+        H[(Service Registry - Consul/Etcd)]
     end
 
-    subgraph "Internal Network (High-Speed gRPC)"
+    subgraph "Internal Network (gRPC)"
         D{Transcoder}
         E[Inventory Service]
         F[Order Service]
-        G[Payment Service]
     end
 
-    subgraph "Control Plane & Observability"
-        H[(Service Registry - Etcd/Consul)]
-        I[Prometheus / Grafana]
-        J[Jaeger Tracing]
-    end
-
-    %% Connections
-    A -->|JSON / HTTP/1.1| B
+    %% Data Flow
+    A -->|JSON| B
     B --> C
-    C -->|Internal Request| D
-    D -.->|Binary Protobuf / HTTP/2| E
-    D -.->|Binary Protobuf / HTTP/2| F
-    D -.->|Binary Protobuf / HTTP/2| G
+    
+    %% The "Discovery" lookup you mentioned
+    C <-->|1. Where is the service?| H
+    
+    C -->|2. Send Request| D
+    D -.->|Binary Protobuf| E
+    D -.->|Binary Protobuf| F
 
-    %% Discovery & Monitoring
-    E <--> H
-    F <--> H
-    G <--> H
-    E -.-> I
-    F -.-> I
-    G -.-> J
+    %% Health Checks
+    E -.->|Heartbeat| H
+    F -.->|Heartbeat| H
 ```
 
 This table summarizes the core components of a modern, gRPC-backed microservices architecture. It highlights the transition from public-facing protocols to high-performance internal communication.
