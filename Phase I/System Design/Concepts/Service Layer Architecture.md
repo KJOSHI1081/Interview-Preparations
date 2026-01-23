@@ -262,7 +262,87 @@ This table summarizes the core components of a modern, gRPC-backed microservices
 | **Service Registry** | Maintains a real-time list of healthy service IP addresses. | Raft / Gossip |
 | **Observability** | Tracks metrics (Prometheus) and distributed traces (Jaeger). | AP Protocol |
 
+## 🌐 WebSocket Transcoding: Bridging the Stream
 
+In a gRPC-backed architecture, WebSockets are bridged to **gRPC Bidirectional Streams**. The Transcoder's job shifts from "parsing a message" to "managing a stateful pipe."
+
+### The "Translation Loop"
+Unlike standard REST calls, the Transcoder stays active for the entire duration of the WebSocket connection:
+
+1.  **JSON Frame Inbound:** Client sends JSON $\rightarrow$ Transcoder serializes to Protobuf $\rightarrow$ Pushes to gRPC Stream.
+2.  **Proto Message Outbound:** Backend pushes Protobuf $\rightarrow$ Transcoder deserializes to JSON $\rightarrow$ Pushes to WebSocket.
+
+### 🧱 Architectural Implementation: The Integrated Proxy
+Most Staff-level designs use **Envoy** as the Gateway. Envoy uses a "gRPC-JSON Transcoder" filter that processes frames in-memory.
+
+* **Connection Persistence:** The Gateway must track which WebSocket ID maps to which gRPC Stream ID. 
+* **Backpressure:** If the client sends JSON faster than the gRPC backend can process it, the Transcoder must manage the buffer (Backpressure) to avoid memory exhaustion.
+
+
+## 🛰️ Gateway-to-Transcoder Protocols
+
+The communication protocol between these two components is determined by the **Deployment Topology**.
+
+### 1. Integrated (In-Process)
+* **Used In:** Envoy, NGINX with NJS, custom Go/Rust gateways.
+* **Protocol:** **Zero-copy Memory Buffers**.
+* **Staff Logic:** Best for ultra-low latency. Data stays in the same process space; the "protocol" is simply moving pointers in RAM.
+
+### 2. Sidecar (Localhost)
+* **Used In:** Kubernetes Pods where the Gateway and Transcoder are separate containers.
+* **Protocol:** **Unix Domain Sockets (UDS)**.
+* **Staff Logic:** UDS is faster than TCP/IP because it avoids the overhead of routing, headers, and checksums. It treats the inter-container talk as a local file-system operation.
+
+### 3. Distributed (BFF)
+* **Used In:** Architectures where a "dumb" Load Balancer sits in front of a "smart" Transcoder service.
+* **Protocol:** **WebSocket Passthrough**.
+* **Staff Logic:** The Gateway doesn't "talk" to the Transcoder; it just tunnels the traffic. The Transcoder is the true protocol terminator.
+
+
+## 🛰️ Protocol Stack: Client-to-Backend Flow
+
+In a professional architecture, the protocol changes at each hop to balance **compatibility** (on the edge) with **performance** (in the core).
+
+
+
+### Protocol Comparison Table
+
+| Connection Segment | Protocol Used | Data Format |
+| :--- | :--- | :--- |
+| **Client ↔ Gateway** | **WebSocket (WSS)** | JSON Frames |
+| **Gateway ↔ Transcoder** | **UDS / In-Memory** | Raw Bytes / JSON |
+| **Transcoder ↔ Backend** | **gRPC (HTTP/2)** | **Binary Protobuf** |
+
+---
+
+### 🔍 Architectural Deep Dive
+
+1.  **Client ↔ Gateway (The Public Edge):** Uses **WebSocket (Secure)** to maintain a persistent, bidirectional connection over port 443. This is essential for bypassing firewalls and providing real-time updates to browsers.
+
+2.  **Gateway ↔ Transcoder (The Internal Bridge):** * **In-Memory:** If the Gateway and Transcoder are the same process (e.g., Envoy), they use **shared memory pointers**. This is the fastest possible communication.
+    * **UDS (Unix Domain Sockets):** If they are separate containers in the same Pod, they use UDS. This bypasses the TCP/IP stack (no checksums, no routing), reducing latency by ~30% compared to local TCP.
+
+3.  **Transcoder ↔ Backend (The Private Core):** Uses **gRPC over HTTP/2**. This allows for "Multiplexing," where multiple user streams are packed into a single TCP connection between the Transcoder and the Backend Service, drastically reducing the "Handshake" overhead.
+
+
+
+---
+
+### 💡 Staff-Level Strategy: "Protocol Buffering"
+In high-load scenarios, the Transcoder acts as a **Buffer**. If the client (WebSocket) is on a slow 3G connection, the Transcoder gathers the gRPC response from the backend quickly and "trickles" it back to the client. This prevents your expensive internal backend services from being held open by slow mobile clients.
+---
+
+### 💡 Staff Interview Pro-Tip: "Avoid the Double-Parse"
+If an interviewer asks how to optimize this protocol:
+> "The biggest risk in Gateway-to-Transcoder communication is the **Double-Parse**. If the Gateway parses the JSON to check for an API Key, and then the Transcoder parses the *same* JSON to convert it to Protobuf, you've doubled your CPU cost. In a Staff-level design, we use **Header-Based Routing** so the Gateway only looks at metadata, leaving the heavy payload parsing to be done exactly once by the Transcoder."
+
+
+---
+
+### 💡 Staff Interview Pro-Tip: "Sticky Sessions & State"
+When an interviewer asks about scaling WebSockets with gRPC:
+
+> "Scaling WebSockets is a **stateful** challenge. Unlike REST, you cannot simply load balance every frame. The Gateway must use **Sticky Sessions** or a **Consistent Hashing** mechanism. If a WebSocket connection is moved to a different Gateway instance, the underlying gRPC stream must be torn down and re-established, which can cause 'blips' in real-time data. We mitigate this by using a **Distributed Connection Registry** (like Redis) to track where each user's stream is currently hosted."
 
 ---
 
