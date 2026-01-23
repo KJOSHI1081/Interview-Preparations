@@ -156,7 +156,27 @@ TCP ensures every packet arrives in order. UDP sends packets as fast as the netw
 ### Real-World Use Case 2: Video Conferencing (Zoom/WebRTC)
 * **Why?** If you lose a tiny bit of audio data in a call, you might hear a small "click," but the conversation continues. If you used TCP, the audio would freeze/buffer while waiting for that tiny lost packet, ruining the real-time experience.
 
+## ⚖️ Protocol Analysis: WebSocket vs. gRPC
 
+A common misconception is that gRPC is faster because it lives "lower" in the networking stack. In reality, both are **Layer 7 (Application)** protocols. The speed difference comes from **Serialization** and **Transport Efficiency**.
+
+### 1. The Stack Comparison
+* **WebSocket Stack:** IP → TCP → WebSocket Frame → **JSON (Text)**
+* **gRPC Stack:** IP → TCP → TLS → **HTTP/2** → **Protobuf (Binary)**
+
+### 2. Why gRPC wins in the Backend
+* **Multiplexing:** gRPC (via HTTP/2) can send hundreds of concurrent requests over a single TCP connection. WebSockets traditionally handle one stream of data per connection.
+* **CPU Efficiency:** Parsing a Protobuf binary message is significantly faster than tokenizing a WebSocket JSON string.
+* **Header Compression:** gRPC uses HPACK to compress metadata; WebSockets send headers only during the initial handshake, but every frame has its own overhead.
+
+---
+
+### 💡 Staff Interview Pro-Tip: "The L7 Overhead"
+If an interviewer suggests moving to TCP direct (Layer 4) for performance:
+> "While moving to raw TCP/UDP (L4) removes the overhead of HTTP/2 or WebSockets, we lose **Metadata (Headers)**, **Built-in Security (TLS)**, and **Standardized Observability**. For 99% of microservices, the $1$-$2ms$ overhead of gRPC (L7) is a worthy trade-off for the developer velocity provided by Protobuf and strict contracts."
+ 
+### 💡 Staff Perspective on WebSockets
+We use WebSockets at the Edge (Client ↔ Gateway) because browsers have universal support for them. We use gRPC in the Core (Gateway ↔ Backend) because we control both ends of the wire and want maximum throughput and type safety.
 
 ---
 
