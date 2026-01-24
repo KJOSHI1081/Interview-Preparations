@@ -39,6 +39,29 @@ def is_palindrome(s):
         l, r = l + 1, r - 1
     return True
 
+def longest_palindrome(s: str) -> str:
+    if not s: return ""
+    
+    def get_palindrome(left, right):
+        # Expand as long as characters match and we are within bounds
+        while left >= 0 and right < len(s) and s[left] == s[right]:
+            left -= 1
+            right += 1
+        # Return the valid palindrome found (adjusting for the final decrement/increment)
+        return s[left + 1:right]
+
+    ans = ""
+    for i in range(len(s)):
+        # Case 1: Odd length (center is a character like 'aba')
+        p1 = get_palindrome(i, i)
+        # Case 2: Even length (center is between characters like 'abba')
+        p2 = get_palindrome(i, i + 1)
+        
+        # Keep the longest one found so far
+        ans = max(ans, p1, p2, key=len)
+        
+    return ans
+
 def max_area(height):
     """
     Problem: Container With Most Water.

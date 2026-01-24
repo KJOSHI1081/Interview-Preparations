@@ -17,12 +17,84 @@ STAFF-LEVEL KEY TAKEAWAYS:
 
 4. THE "AT MOST" TRICK: For "Exactly K" problems, always remember the 
    mathematical decomposition: Exactly(K) = AtMost(K) - AtMost(K-1).
+
+
+To master the Sliding Window pattern, you need to recognize that it comes in two flavors: Fixed Size (easier) and Variable Size (harder).
+
+If you master these 7 problems, you will cover roughly 90% of the variations used in interviews at companies like Google, Meta, and Amazon.
+
+1. The "Basics" (Fixed Window)
+Maximum Sum Subarray of Size K: The introductory problem. It teaches you how to "roll" the window by adding the new element and subtracting the old one.
+
+Find All Anagrams in a String: Teaches you how to use a frequency map (hash map) inside a sliding window.
+
+Pattern: Maintain a window of size len(target). If the character counts match, you've found an anagram.
+
+2. The "Shrinkable" (Variable Window)
+Longest Substring Without Repeating Characters: The absolute classic. It teaches you how to dynamically move the start pointer based on a condition (duplicate discovery).
+
+Longest Repeating Character Replacement: A common "Hard-Medium." It forces you to track the frequency of the most common character in the current window to decide if the window is still "valid."
+
+3. The "Constraint" Pattern (The "Nice Substring" style)
+Subarrays with K Different Integers: This is a "Hard" problem. It uses the "At Most K" trick. To find "Exactly K," you calculate atMost(K) - atMost(K-1).
+
+Fruit Into Baskets: A friendly way to practice windows with a constraint of "exactly 2 types."
+
+4. The "Final Boss"
+Minimum Window Substring: If you can solve this from scratch without help, you have mastered the pattern. It involves a "matching" counter and complex pointer movements.
 -------------------------------------------------------------------------------
 """
 
 from collections import Counter, deque
 
 class SlidingWindowMastery:
+    
+    def max_sub_array_of_size_k(self, k: int, arr: list[int]) -> int:
+        """
+        1. MAXIMUM SUM SUBARRAY OF SIZE K (Fixed Window)
+        Definition: Find the contiguous subarray of size k with the largest sum.
+        Input: arr = [2, 1, 5, 1, 3, 2], k = 3
+        Output: 9 (from [5, 1, 3])
+        Complexity: Time O(N), Space O(1)
+        """
+        max_sum, window_sum = 0, 0
+        start = 0
+
+        for end in range(len(arr)):
+            window_sum += arr[end]
+            
+            # Slide the window once we reach size k
+            if end >= k - 1:
+                max_sum = max(max_sum, window_sum)
+                window_sum -= arr[start]
+                start += 1
+        return max_sum
+    
+
+    def findAnagrams(self, s: str, p: str) -> list[int]:
+            """
+            2. FIND ALL ANAGRAMS IN A STRING (Fixed Window + Hash Map)
+            Definition: Find all start indices of p's anagrams in s.
+            Input: s = "cbaebabacd", p = "abc"
+            Output: [0, 6]
+            Complexity: Time O(N), Space O(1) (max 26 chars in map)
+            """
+            p_count = Counter(p)
+            s_count = Counter()
+            res = []
+            
+            for i in range(len(s)):
+                s_count[s[i]] += 1
+                if i >= len(p):
+                    left_char = s[i - len(p)]
+                    if s_count[left_char] == 1:
+                        del s_count[left_char]
+                    else:
+                        s_count[left_char] -= 1
+                
+                if s_count == p_count:
+                    res.append(i - len(p) + 1)
+            return res
 
     # 1. Longest Substring Without Repeating Characters (Dynamic Window)
     # Signal: Ability to handle deduplication in streaming data.
@@ -68,10 +140,64 @@ class SlidingWindowMastery:
             max_len = max(max_len, end - start + 1)
             
         return max_len
+    
+    def characterReplacement(self, s: str, k: int) -> int:
+            """
+            4. LONGEST REPEATING CHARACTER REPLACEMENT (Variable + Constraint)
+            Definition: Maximize same-letter substring length by replacing k chars.
+            Input: s = "AABABBA", k = 1
+            Output: 4
+            Complexity: Time O(N), Space O(1)
+            """
+            count = {}
+            max_len = start = max_freq = 0
+            
+            for end in range(len(s)):
+                count[s[end]] = count.get(s[end], 0) + 1
+                # Track the most frequent character in the current window
+                max_freq = max(max_freq, count[s[end]])
+                
+                # If (window size - max_freq) > k, we need more than k replacements
+                if (end - start + 1) - max_freq > k:
+                    count[s[start]] -= 1
+                    start += 1
+                    
+                max_len = max(max_len, end - start + 1)
+            return max_len
+    
+    def totalFruit(self, fruits: list[int]) -> int:
+        """
+        5. FRUIT INTO BASKETS (Variable + 2-Unique Constraint)
+        Definition: Find longest subarray with at most 2 unique integers.
+        Input: fruits = [1, 2, 3, 2, 2]
+        Output: 4 ([2, 3, 2, 2])
+        Complexity: Time O(N), Space O(1)
+        """
+        count = {}
+        start = max_fruits = 0
+        
+        for end in range(len(fruits)):
+            count[fruits[end]] = count.get(fruits[end], 0) + 1
+            
+            while len(count) > 2:
+                count[fruits[start]] -= 1
+                if count[fruits[start]] == 0:
+                    del count[fruits[start]]
+                start += 1
+            max_fruits = max(max_fruits, end - start + 1)
+        return max_fruits 
 
     # 2. Minimum Window Substring (Dynamic Window - Two State Counters)
     # Signal: Mastering complex contraction logic and optimization.
     def minWindow(self, s: str, t: str) -> str:
+        '''
+                (Hard / The Final Boss)
+                Definition: Smallest substring in s containing all chars of t.
+                Input: s = "ADOBECODEBANC", t = "ABC"
+                Output: "BANC"
+                Complexity: Time O(N + M), Space O(N + M)
+        '''
+
         if not t or not s: return ""
         target_count = Counter(t)
         required = len(target_count)
@@ -116,26 +242,17 @@ class SlidingWindowMastery:
                 res.append(nums[q[0]])
         return res
 
-    # 4. Longest Repeating Character Replacement (Dynamic Window - Max Frequency)
-    # Signal: Understanding error-tolerance and "best-fit" windowing.
-    def characterReplacement(self, s: str, k: int) -> int:
-        count = {}
-        max_f = l = res = 0
-        for r in range(len(s)):
-            count[s[r]] = 1 + count.get(s[r], 0)
-            # max_f tracks the most frequent char we've ever seen in a window
-            max_f = max(max_f, count[s[r]])
-            
-            # Window is invalid if replacements needed > k
-            if (r - l + 1) - max_f > k:
-                count[s[l]] -= 1
-                l += 1
-            res = max(res, r - l + 1)
-        return res
-
     # 5. Subarrays with K Different Integers (The Decomposition Pattern)
     # Signal: Complex problem decomposition—the mark of a Staff Engineer.
     def subarraysWithKDistinct(self, nums: list[int], k: int) -> int:
+        """
+            6. SUBARRAYS WITH K DIFFERENT INTEGERS (Hard / Exactly K)
+            Definition: Count subarrays with exactly k different integers.
+            Pattern: Exactly(K) = AtMost(K) - AtMost(K-1)
+            Input: nums = [1, 2, 1, 2, 3], k = 2
+            Output: 7
+            Complexity: Time O(N), Space O(K)
+        """
         def atMost(n):
             count = {}
             l = res = 0
