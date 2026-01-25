@@ -45,7 +45,7 @@ Minimum Window Substring: If you can solve this from scratch without help, you h
 -------------------------------------------------------------------------------
 """
 
-from collections import Counter, deque
+from collections import Counter, deque, defaultdict
 
 class SlidingWindowMastery:
     
@@ -76,6 +76,18 @@ class SlidingWindowMastery:
             2. FIND ALL ANAGRAMS IN A STRING (Fixed Window + Hash Map)
             Definition: Find all start indices of p's anagrams in s.
             Input: s = "cbaebabacd", p = "abc"
+            If the input is:
+                s = "cbaebabacd"
+
+                p = "abc"
+
+                Index 0: Substring "cba" is an anagram of "abc". → [0]
+
+                Index 1: Substring "bae" is NOT an anagram.
+
+                Index 2: Substring "aeb" is NOT an anagram.
+
+                Index 6: Substring "bac" is an anagram of "abc". → [0, 6]
             Output: [0, 6]
             Complexity: Time O(N), Space O(1) (max 26 chars in map)
             """
@@ -96,7 +108,7 @@ class SlidingWindowMastery:
                     res.append(i - len(p) + 1)
             return res
 
-    # 1. Longest Substring Without Repeating Characters (Dynamic Window)
+    # 1. Longest Substring Without Repeating Characters (Variable (Shrinkable) Window)
     # Signal: Ability to handle deduplication in streaming data.
     def lengthOfLongestSubstring(self, s: str) -> int:
         char_map = {} 
@@ -143,7 +155,7 @@ class SlidingWindowMastery:
     
     def characterReplacement(self, s: str, k: int) -> int:
             """
-            4. LONGEST REPEATING CHARACTER REPLACEMENT (Variable + Constraint)
+            4. LONGEST REPEATING CHARACTER REPLACEMENT (Dynamic (Non-Shrinkable) Window + Constraint)
             Definition: Maximize same-letter substring length by replacing k chars.
             Input: s = "AABABBA", k = 1
             Output: 4
@@ -186,46 +198,33 @@ class SlidingWindowMastery:
                 start += 1
             max_fruits = max(max_fruits, end - start + 1)
         return max_fruits 
-
-    # 2. Minimum Window Substring (Dynamic Window - Two State Counters)
-    # Signal: Mastering complex contraction logic and optimization.
-    def minWindow(self, s: str, t: str) -> str:
-        '''
-                (Hard / The Final Boss)
-                Definition: Smallest substring in s containing all chars of t.
-                Input: s = "ADOBECODEBANC", t = "ABC"
-                Output: "BANC"
-                Complexity: Time O(N + M), Space O(N + M)
-        '''
-
-        if not t or not s: return ""
-        target_count = Counter(t)
-        required = len(target_count)
-        l = r = formed = 0
-        window_counts = {}
-        # (length, left, right)
-        ans = float("inf"), None, None
-
-        while r < len(s):
-            char = s[r]
-            window_counts[char] = window_counts.get(char, 0) + 1
-            if char in target_count and window_counts[char] == target_count[char]:
-                formed += 1
-            
-            # Contract window
-            while l <= r and formed == required:
-                char = s[l]
-                if r - l + 1 < ans[0]:
-                    ans = (r - l + 1, l, r)
-                window_counts[char] -= 1
-                if char in target_count and window_counts[char] < target_count[char]:
-                    formed -= 1
-                l += 1    
-            r += 1
-        return "" if ans[0] == float("inf") else s[ans[1] : ans[2] + 1]
-
+    
     # 3. Sliding Window Maximum (Fixed Window - Monotonic Deque)
     # Signal: Efficiently managing peak values in time-series data.
+    '''
+        You are given an array of integers nums, there is a sliding window of size k which is moving from the 
+        very left of the array to the very right. You can only see the k numbers in the window. 
+        Each time the sliding window moves right by one position.
+        Return the max sliding window.
+
+        Example 1:
+
+        Input: nums = [1,3,-1,-3,5,3,6,7], k = 3
+        Output: [3,3,5,5,6,7]
+        Explanation: 
+        Window position                Max
+        ---------------               -----
+        [1  3  -1] -3  5  3  6  7       3
+        1 [3  -1  -3] 5  3  6  7       3
+        1  3 [-1  -3  5] 3  6  7       5
+        1  3  -1 [-3  5  3] 6  7       5
+        1  3  -1  -3 [5  3  6] 7       6
+        1  3  -1  -3  5 [3  6  7]      7
+        Example 2:
+
+        Input: nums = [1], k = 1
+        Output: [1]
+    '''
     def maxSlidingWindow(self, nums: list[int], k: int) -> list[int]:
         res = []
         # Stores indices of elements in decreasing order of their values
@@ -242,6 +241,70 @@ class SlidingWindowMastery:
                 res.append(nums[q[0]])
         return res
 
+    # 2. Minimum Window Substring (Dynamic Window - Two State Counters)
+    # Signal: Mastering complex contraction logic and optimization. 
+
+    def minWindow(self, s: str, t: str) -> str:
+        ans = ""
+        # Base Case: If source is smaller than target, a valid window is impossible
+        if not s or not t or len(s) < len(t): 
+            return ans
+        
+        # window: current character frequencies in the sliding window
+        # target: required character frequencies from string 't'
+        window, target = defaultdict(int), defaultdict(int)
+        for c in t:
+            target[c] += 1
+
+        # have: how many unique characters in 'window' meet the frequency in 'target'
+        # need: the total unique characters in 't' that must be satisfied
+        have, need = 0, len(target)
+        min_window_size = float('inf')
+
+        start = end = 0
+
+        # EXPANSION PHASE: Move the 'end' pointer to find a valid window
+        while end < len(s):
+            c = s[end]
+            window[c] += 1
+            
+            # If the current character's count matches exactly what we need, increment 'have'
+            if c in target and target[c] == window[c]:
+                have += 1
+            
+            # CONTRACTION PHASE: Once the window is valid ('have == need'), 
+            # shrink from the 'start' to find the smallest possible substring
+            while have == need and start <= end:
+                window_size = (end - start + 1)
+                
+                # Update the global minimum if the current window is smaller
+                if min_window_size > window_size:
+                    ans = s[start: end + 1]
+                    min_window_size = window_size
+                
+                # Remove the character at 'start' and move the pointer forward
+                c = s[start]
+                window[c] -= 1
+                
+                # If removing this char breaks our 'target' requirement, decrement 'have'
+                if c in target and window[c] < target[c]:
+                    have -= 1
+                
+                start += 1 # Shrink the window
+                
+            end += 1 # Expand the window
+            
+        return ans
+
+    
+    '''
+    Think of it this way:
+
+    Min Window Substring: You want the smallest window that satisfies a condition.
+
+    Subarrays with K Distinct: You want all possible windows that satisfy a condition.
+    '''
+
     # 5. Subarrays with K Different Integers (The Decomposition Pattern)
     # Signal: Complex problem decomposition—the mark of a Staff Engineer.
     def subarraysWithKDistinct(self, nums: list[int], k: int) -> int:
@@ -252,6 +315,27 @@ class SlidingWindowMastery:
             Input: nums = [1, 2, 1, 2, 3], k = 2
             Output: 7
             Complexity: Time O(N), Space O(K)
+
+            Given an integer array nums and an integer k, return the number of good subarrays of nums.
+
+            A good array is an array where the number of different integers in that array is exactly k.
+
+            For example, [1,2,3,1,2] has 3 different integers: 1, 2, and 3.
+            A subarray is a contiguous part of an array.
+
+            
+
+            Example 1:
+
+            Input: nums = [1,2,1,2,3], k = 2
+            Output: 7
+            Explanation: Subarrays formed with exactly 2 different integers: [1,2], [2,1], [1,2], [2,3], [1,2,1], [2,1,2], [1,2,1,2]
+            Example 2:
+
+            Input: nums = [1,2,1,3,4], k = 3
+            Output: 3
+            Explanation: Subarrays formed with exactly 3 different integers: [1,2,1,3], [2,1,3], [1,3,4].
+ 
         """
         def atMost(n):
             count = {}
@@ -266,9 +350,69 @@ class SlidingWindowMastery:
                 res += (r - l + 1)
             return res
         return atMost(k) - atMost(k - 1)
+    
+    '''
+    To return the actual subarrays (the lists of elements) rather than just the count, we use the Three-Pointer technique. 
+    This allows us to find the range of valid starting positions for every ending position
+    This solution uses two "left" pointers to maintain the boundaries of the "Exactly K" range.
+    o build a solution that is efficient for both counting and returning the subarrays, we use the Three-Pointer strategy.The beauty of this approach is that for every right position, the number of valid subarrays is simply the "width" of the start-pointer range: (left_near - left_far). 
+    You can sum these widths to get the count in O(N) time, or iterate through them to collect the subarrays in 
+    O(total subarrays) time.
+
+    Why this is the "Staff" choiceSingle Pass Logic: We only traverse the right pointer once.
+    We don't need to run two separate "AtMost" functions, which saves on overhead.
+    Decoupled Complexity: * The count logic remains O(N).
+    The collection logic is O(total subarrays).
+    By using a boolean flag or a generator, you avoid the O(N^2) space penalty when you only need the count.
+    The "Gap" Logic: The distance between left_far (the earliest valid start) and left_near (the first invalid start after shrinking) 
+    represents the number of duplicates we can skip while still having exactly K distinct numbers.
+    '''
+
+    def solve_k_distinct(nums: list[int], k: int, return_list: bool = False):
+        left, right, prefix = 0, 0, 0
+        sub_arrays = []
+        window = defaultdict(int)
+        res = 0
+
+        while right < len(nums):
+            num = nums[right]
+            window[num] += 1
+            
+            # Phase 1: Keep window valid (distinct count <= k)
+            while len(window) > k:
+                num = nums[left]
+                window[num] -= 1
+                if not window[num]:
+                    del window[num]
+                left += 1
+                prefix = 0
+            
+            # Phase 2: Count leading duplicates (prefixes)/Standardize the window (shrink left as long as it's a duplicate)
+            while window[nums[left]] > 1:
+                prefix += 1
+                window[nums[left]] -= 1
+                left += 1
+
+            # Phase 3: Collect results
+            if len(window) == k:
+                # 1. Add the current unique window
+                res += (1 + prefix)
+                if return_list:
+                    # 2. Extract subarrays: from (left - prefix) up to left
+                    # All these starting points are valid for the current 'right'
+                    for i in range(left - prefix, left + 1): 
+                        sub_arrays.append(nums[i:right + 1])#  Yield results one by one yield nums[i : right + 1] to reduce the memory footprint
+            right += 1
+        print(f'{sub_arrays=}')
+        return res
+
+    # Example
+    # count, arrays = solve_k_distinct([1, 2, 1, 2, 3], 2, return_list=True)
+
 
 # Example Usage & Testing
 if __name__ == "__main__":
     sol = SlidingWindowMastery()
     print(f"Max Sliding Window: {sol.maxSlidingWindow([1,3,-1,-3,5,3,6,7], 3)}")
     # Expected: [3, 3, 5, 5, 6, 7]
+
