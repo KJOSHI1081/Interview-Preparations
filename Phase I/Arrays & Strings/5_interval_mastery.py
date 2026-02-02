@@ -15,7 +15,29 @@ import heapq
 
 def merge_intervals(intervals):
     """
+    56. Merge Intervals
+
     Problem: Merge all overlapping intervals.
+    
+    Given an array of intervals where intervals[i] = [starti, endi],
+      merge all overlapping intervals, and return an array of the 
+      non-overlapping intervals that cover all the intervals in the input.
+    Example 1:
+
+    Input: intervals = [[1,3],[2,6],[8,10],[15,18]]
+    Output: [[1,6],[8,10],[15,18]]
+    Explanation: Since intervals [1,3] and [2,6] overlap, merge them into [1,6].
+    Example 2:
+
+    Input: intervals = [[1,4],[4,5]]
+    Output: [[1,5]]
+    Explanation: Intervals [1,4] and [4,5] are considered overlapping.
+    Example 3:
+
+    Input: intervals = [[4,7],[1,4]]
+    Output: [[1,7]]
+    Explanation: Intervals [1,4] and [4,7] are considered overlapping.
+
     Logic: Sort by start. If current interval overlaps with the last merged 
     interval, update the end of the last merged interval to be the max of both.
     """
@@ -38,11 +60,31 @@ def merge_intervals(intervals):
             
     return merged
 
-
-
 def insert_interval(intervals, new_interval):
     """
-    Problem: Insert a new interval into a sorted list and merge if necessary.
+    57. Insert Interval
+    Problem: 
+    
+    You are given an array of non-overlapping intervals intervals where 
+    intervals[i] = [starti, endi] represent the start and the end of the ith interval and intervals
+      is sorted in ascending order by starti. You are also given an interval newInterval = [start, end] 
+      that represents the start and end of another interval.
+
+    Insert newInterval into intervals such that intervals is still sorted in ascending order by starti 
+    and intervals still does not have any overlapping intervals (merge overlapping intervals if necessary).
+    Return intervals after the insertion. 
+    Note that you don't need to modify intervals in-place. You can make a new array and return it. 
+
+    Example 1:
+
+    Input: intervals = [[1,3],[6,9]], newInterval = [2,5]
+    Output: [[1,5],[6,9]]
+    Example 2:
+
+    Input: intervals = [[1,2],[3,5],[6,7],[8,10],[12,16]], newInterval = [4,8]
+    Output: [[1,2],[3,10],[12,16]]
+    Explanation: Because the new interval [4,8] overlaps with [3,5],[6,7],[8,10].
+    Insert a new interval into a sorted list and merge if necessary.
     Logic: 
     1. Add all intervals ending before the new one starts.
     2. Merge all overlapping intervals with the new one.
@@ -72,12 +114,48 @@ def insert_interval(intervals, new_interval):
         
     return res
 
-def meeting_rooms_ii(intervals):
+def meeting_rooms_ii(intervals,use_heap=False):
     """
+    LeetCode #253: Meeting Rooms II.
     Problem: Find minimum number of conference rooms required.
+        Given an array of meeting time intervals consisting of start and end times [[s1,e1],[s2,e2],...], 
+        where s_i < e_i, find the minimum number of conference rooms required to hold all meetings.
+        
+        Example Walkthrough
+        Input: intervals = [[0, 30], [5, 10], [15, 20]]
+
+        Time 0: Meeting 1 starts [0, 30]. Rooms needed: 1
+        Time 5: Meeting 2 starts [5, 10]. It overlaps with Meeting 1. Rooms needed: 2
+        Time 10: Meeting 2 ends. One room becomes free. Rooms in use: 1
+        Time 15: Meeting 3 starts [15, 20]. Meeting 1 is still going, 
+            but Meeting 2's room is now empty. We reuse that room. Rooms in use: 2
+        Time 20: Meeting 3 ends.
+        Time 30: Meeting 1 ends.
+
+        Result: The maximum number of simultaneous meetings was 2.
     Logic: Use a Min-Heap to track the end times of meetings currently in rooms.
     If a new meeting starts after the earliest meeting ends, reuse that room.
     """
+
+    if not use_heap:
+        sorted_starts = sorted(intervals, key=lambda x: x[0])
+        sorted_ends = sorted(intervals, key=lambda x: x[1])
+        s_i, e_i = 0, 0
+        res = 0
+        count = 0
+        while s_i < len(sorted_starts):
+            if sorted_starts[s_i] < sorted_ends[e_i]:
+                count += 1
+                s_i += 1
+            else:
+                count -= 1
+                e_i += 1
+            res = max(res, count)
+        
+        return res
+
+
+
     import heapq
     if not intervals: return 0
     
@@ -94,11 +172,15 @@ def meeting_rooms_ii(intervals):
         
     return len(rooms)
 
-
-
 def interval_intersection(list1, list2):
     """
+    986. Interval List Intersections
+
     Problem: Find the intersection of two sets of sorted intervals.
+
+    Input: firstList = [[0,2],[5,10],[13,23],[24,25]], secondList = [[1,5],[8,12],[15,24],[25,26]]
+    Output: [[1,2],[5,5],[8,10],[15,23],[24,24],[25,25]]
+
     Logic: Two Pointers. The intersection starts at max(s1, s2) 
     and ends at min(e1, e2). Increment the pointer of the interval that ends first.
     """
@@ -144,7 +226,7 @@ class Interval:
 # Min-Heap to process the "earliest" work intervals across all employees.
 # =============================================================================
 
-def employee_free_time(schedule):
+def employee_free_time(schedule, use_heap=False):
     """
     Problem: Find the common free time for all employees.
     Logic: 
@@ -153,6 +235,31 @@ def employee_free_time(schedule):
     3. If the next interval starts AFTER the anchor, the gap in between is free time.
     Complexity: O(N log K) where N is total intervals and K is number of employees.
     """
+
+    if not use_heap:
+        composite_calender = []
+        #Flattening the calendar that includes all the employee schedule
+        for emp_schedule in schedule:
+            for interval in emp_schedule:
+                composite_calender.append(interval)
+        #Sorting them by their start time     
+        composite_calender.sort(key=lambda x: x.start)
+
+        #Using prev_end as initial farthest busiest end
+        prev_end = composite_calender[0].end
+        free_times = []
+        for i in range(1, len(composite_calender)):
+            curr = composite_calender[i]
+            #check if any gap available
+            if curr.start > prev_end:
+                free_times.append(Interval(curr.start, prev_end))
+            #update the farthest busiest end
+            prev_end = max(prev_end, curr.end)
+        return free_times
+
+
+
+
     min_heap = []
     
     # 1. Push the first interval of each employee into the heap
