@@ -1,5 +1,4 @@
 # Staff Engineer Interview Preparation Roadmap
-# Staff Engineer Interview Preparation Roadmap
 
 | Phase | Weeks | DSA (2h Weekday / 4h Weekend) | SysDesign (1h Daily) | Behavioral (1h Weekend) |
 | :--- | :--- | :--- | :--- | :--- |
